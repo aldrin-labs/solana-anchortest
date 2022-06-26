@@ -1,3 +1,5 @@
+//! Some helper methods for creating common account data structures.
+
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program_option::COption;
 pub use anchor_spl::token::spl_token::state::{Account, AccountState, Mint};
