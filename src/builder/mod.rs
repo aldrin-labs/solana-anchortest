@@ -1,3 +1,6 @@
+//! Helpers to build state which can be used to construct [`Context`]. This then
+//! serves as an input to a program's endpoints.
+
 use anchor_lang::solana_program::bpf_loader_upgradeable;
 use anchor_lang::{prelude::*, system_program};
 use solana_sdk::program_pack::Pack;
@@ -7,6 +10,7 @@ use std::rc::Rc;
 
 pub type Bumps = BTreeMap<String, u8>;
 
+/// Builder pattern for specifying accounts relevant for a tested endpoint.
 #[derive(Default)]
 pub struct ContextWrapper<'info> {
     pub program: Pubkey,
@@ -24,6 +28,9 @@ impl<'info> ContextWrapper<'info> {
         }
     }
 
+    /// Adds a new account - the order matters! Call this method for each
+    /// account in the same order as they are defined in the endpoint's
+    /// [`Accounts`] declaration struct.
     pub fn acc(mut self, account: &'info mut AccountInfoWrapper) -> Self {
         if let Some((name, bump)) = &account.pda {
             self.bumps.insert(name.clone(), *bump);
@@ -31,6 +38,15 @@ impl<'info> ContextWrapper<'info> {
 
         self.accounts.push(account.to_account_info());
 
+        self
+    }
+
+    // Set the remaining accounts attached to the [`Context`].
+    pub fn remaining_accounts(
+        mut self,
+        accs: impl Iterator<Item = &'info mut AccountInfoWrapper>,
+    ) -> Self {
+        self.remaining_accounts = accs.map(|a| a.to_account_info()).collect();
         self
     }
 
@@ -43,14 +59,18 @@ impl<'info> ContextWrapper<'info> {
         )
     }
 
-    pub fn remaining_accounts(
-        mut self,
-        accs: impl Iterator<Item = &'info mut AccountInfoWrapper>,
-    ) -> Self {
-        self.remaining_accounts = accs.map(|a| a.to_account_info()).collect();
-        self
-    }
-
+    /// Creates the [`Context`] which can be used to call an endpoint:
+    ///
+    /// ```rust,ignore
+    /// let mut ctx = ContextWrapper {
+    ///     // TODO: set accounts
+    ///     ..Default::default()
+    /// };
+    /// let mut accounts = ctx.accounts()?;
+    ///
+    /// endpoint_fn(ctx.build(&mut accounts))?;
+    /// accounts.exit(&program_id)?;
+    /// ```
     pub fn build<'builder, 'accs, T: anchor_lang::Accounts<'info>>(
         &'builder self,
         accounts: &'accs mut T,
@@ -64,6 +84,7 @@ impl<'info> ContextWrapper<'info> {
     }
 }
 
+/// Holds state for [`AccountInfo`].
 #[derive(Default, Clone, Debug, PartialEq)]
 pub struct AccountInfoWrapper {
     pub key: Pubkey,
@@ -78,7 +99,9 @@ pub struct AccountInfoWrapper {
 }
 
 impl AccountInfoWrapper {
-    pub fn to_account_info<'wrapper>(&'wrapper mut self) -> AccountInfo<'wrapper> {
+    pub fn to_account_info<'wrapper>(
+        &'wrapper mut self,
+    ) -> AccountInfo<'wrapper> {
         AccountInfo {
             key: &self.key,
             is_signer: self.is_signer,
@@ -103,6 +126,8 @@ impl AccountInfoWrapper {
         }
     }
 
+    /// # Important
+    /// The program is not set as the accounts owner.
     pub fn pda(program: Pubkey, name: impl ToString, seeds: &[&[u8]]) -> Self {
         let (key, bump) = Pubkey::find_program_address(seeds, &program);
         Self {
@@ -123,6 +148,8 @@ impl AccountInfoWrapper {
         self
     }
 
+    /// Fill the data buffer with this many zero bytes. Useful when initing an
+    /// account - it cannot be done in the stubs.
     pub fn size(mut self, space: usize) -> Self {
         self.data.resize(space, 0);
         self
@@ -132,18 +159,23 @@ impl AccountInfoWrapper {
         self.program_with_data_addr(Pubkey::new_unique())
     }
 
-    pub fn program_with_data_addr(mut self, programdata_address: Pubkey) -> Self {
+    /// [`UpgradeableLoaderState::Program`]
+    pub fn program_with_data_addr(
+        mut self,
+        programdata_address: Pubkey,
+    ) -> Self {
         self.owner = bpf_loader_upgradeable::ID;
         self.executable = true;
 
         self.raw(
-            bincode::serialize(&anchor_lang::prelude::UpgradeableLoaderState::Program {
+            bincode::serialize(&UpgradeableLoaderState::Program {
                 programdata_address,
             })
             .unwrap(),
         )
     }
 
+    /// [`UpgradeableLoaderState::ProgramData`]
     pub fn program_data(self, program_authority: Pubkey) -> Self {
         self.owner(bpf_loader_upgradeable::ID).raw(
             bincode::serialize(&UpgradeableLoaderState::ProgramData {
@@ -159,21 +191,33 @@ impl AccountInfoWrapper {
         self
     }
 
+    /// # Note
+    /// Be careful to check that the implementation of [`AccountSerialize`] is
+    /// not a no-op. For some types, anchor skips serialization because it
+    /// assumes that those types will never be serialized - e.g.
+    /// [`UpgradeableLoaderState`].
+    ///
+    /// # Note
+    /// Sets the lamports to 1.
     pub fn data(self, acc: impl AccountSerialize) -> Self {
         let mut data = vec![];
         acc.try_serialize(&mut data).expect("Cannot deserialize");
         self.raw(data)
     }
 
+    /// # Note
+    /// Sets the lamports to 1.
     pub fn pack<T: Pack>(self, acc: T) -> Self {
         let mut data = vec![0; T::get_packed_len()];
         acc.pack_into_slice(&mut data);
         self.raw(data)
     }
 
+    /// # Note
+    /// Sets the lamports to 1.
     pub fn raw(mut self, data: Vec<u8>) -> Self {
         self.data = data;
-        self.lamports = 1; // TBD: is this ok?
+        self.lamports = 1;
         self
     }
 }

@@ -1,9 +1,50 @@
+//! Enables stubbing of CPI calls. For example, you can implement the
+//! [`ValidateCpis`] trait for an enum to create a state machine which walks
+//! through the enum's variants representing the different CPIs.
+//!
+//! # Example
+//! ```rust,ignore
+//! use anchortest::stub::Syscalls;
+//! use anchortest::stub::ValidateCpis;
+//! use anchor_lang::prelude::AccountInfo;
+//! use solana_sdk::instruction::Instruction;
+//!
+//! struct CpiValidator(CpiValidatorState);
+//! enum CpiValidatorState {
+//!     FirstCpiCall,
+//!     Done,
+//! }
+//!
+//! impl ValidateCpis for CpiValidator {
+//!     fn validate_next_instruction(
+//!         &mut self,
+//!         ix: &Instruction,
+//!         _accounts: &[AccountInfo],
+//!     ) {
+//!         match self.0 {
+//!             CpiValidatorState::FirstCpiCall => {
+//!                 // TODO: validate
+//!
+//!                 self.0 = CpiValidatorState::Done;
+//!             }
+//!             CpiValidatorState::Done => {
+//!                 panic!("No more instructions expected, got {:#?}", ix);
+//!             }
+//!         }
+//!     }
+//! }
+//!
+//! Syscalls::new(CpiValidatorState::FirstCpiCall).set();
+//! ```
+
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::entrypoint::ProgramResult;
 use anchor_lang::solana_program::instruction::Instruction;
 use std::sync::{Arc, Mutex};
 
 pub trait ValidateCpis {
+    /// Every time the program triggers a CPI, this method is called with the
+    /// payload.
     fn validate_next_instruction(
         &mut self,
         ix: &Instruction,
@@ -11,6 +52,8 @@ pub trait ValidateCpis {
     );
 }
 
+/// Holds the necessary state which determines the configurable behavior of
+/// syscalls.
 #[derive(Default)]
 pub struct Syscalls<T> {
     cpi_validator: Arc<Mutex<T>>,

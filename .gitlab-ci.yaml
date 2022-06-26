@@ -6,3 +6,13 @@ build:
   image: registry.gitlab.com/crypto_project/defi/infra/rust-solana:latest
   script:
     - cargo build
+
+docs:
+  image: registry.gitlab.com/crypto_project/defi/infra/rust-solana:latest
+  artifacts:
+    paths:
+      - public
+  script:
+    # generates docs.rs style page
+    - cargo doc --lib --no-deps --document-private-items
+    - cp -r target/doc public
