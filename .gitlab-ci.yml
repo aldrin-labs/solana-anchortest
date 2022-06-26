@@ -8,6 +8,7 @@ build:
     - cargo build
 
 docs:
+  stage: build
   image: registry.gitlab.com/crypto_project/defi/infra/rust-solana:latest
   artifacts:
     paths:
