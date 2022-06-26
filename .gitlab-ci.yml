@@ -1,5 +1,6 @@
 stages:
   - build
+  - pages
 
 build:
   stage: build
@@ -7,13 +8,15 @@ build:
   script:
     - cargo build
 
-docs:
-  stage: build
+pages:
+  stage: pages
   image: registry.gitlab.com/crypto_project/defi/infra/rust-solana:latest
   artifacts:
     paths:
       - public
   script:
     # generates docs.rs style page
-    - cargo doc --lib --no-deps --document-private-items
+    - cargo doc --lib --no-deps
     - cp -r target/doc public
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
