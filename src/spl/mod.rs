@@ -4,10 +4,15 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program_option::COption;
 pub use anchor_spl::token::spl_token::state::{Account, AccountState, Mint};
 
-pub fn token_account(owner: Pubkey, mint: Option<Pubkey>) -> Account {
+pub trait TokenAccountExt {
+    fn amount(self, amount: u64) -> Self;
+    fn mint(self, mint: Pubkey) -> Self;
+}
+
+pub fn token_account(owner: Pubkey) -> Account {
     Account {
-        mint: mint.unwrap_or_else(Pubkey::new_unique),
         owner,
+        mint: Pubkey::new_unique(),
         state: AccountState::Initialized,
         ..Default::default()
     }
@@ -19,5 +24,17 @@ pub fn mint(mint_authority: Pubkey) -> Mint {
         freeze_authority: COption::None,
         is_initialized: true,
         ..Default::default()
+    }
+}
+
+impl TokenAccountExt for Account {
+    fn amount(mut self, amount: u64) -> Self {
+        self.amount = amount;
+        self
+    }
+
+    fn mint(mut self, mint: Pubkey) -> Self {
+        self.mint = mint;
+        self
     }
 }
