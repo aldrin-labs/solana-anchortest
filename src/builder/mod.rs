@@ -15,8 +15,11 @@ pub type Bumps = BTreeMap<String, u8>;
 pub struct ContextWrapper<'info> {
     pub program: Pubkey,
     pub accounts: Vec<AccountInfo<'info>>,
+    /// Will be accessible via the [`Context`]'s `remaining_accounts` property.
     pub remaining_accounts: Vec<AccountInfo<'info>>,
+    /// Will be accessible via the [`Context`]'s `bumps` property.
     pub bumps: Bumps,
+    /// These data are used by the `#[instruction(...)]` macro.
     pub ix_data: Vec<u8>,
 }
 
@@ -41,12 +44,18 @@ impl<'info> ContextWrapper<'info> {
         self
     }
 
-    // Set the remaining accounts attached to the [`Context`].
+    /// Set the remaining accounts attached to the [`Context`].
     pub fn remaining_accounts(
         mut self,
         accs: impl Iterator<Item = &'info mut AccountInfoWrapper>,
     ) -> Self {
         self.remaining_accounts = accs.map(|a| a.to_account_info()).collect();
+        self
+    }
+
+    /// These data are used by the `#[instruction(...)]` macro.
+    pub fn ix_data(mut self, data: Vec<u8>) -> Self {
+        self.ix_data = data.into();
         self
     }
 
