@@ -57,13 +57,20 @@ pub trait ValidateCpis {
 #[derive(Default)]
 pub struct Syscalls<T> {
     cpi_validator: Arc<Mutex<T>>,
+    slot: u64,
 }
 
 impl<T: ValidateCpis + Send + Sync + 'static> Syscalls<T> {
     pub fn new(cpi_validator: T) -> Self {
         Self {
             cpi_validator: Arc::new(Mutex::new(cpi_validator)),
+            slot: 0,
         }
+    }
+
+    pub fn slot(mut self, slot: u64) -> Self {
+        self.slot = slot;
+        self
     }
 
     pub fn set(self) {
@@ -78,7 +85,12 @@ impl<T: ValidateCpis + Send + Sync> solana_sdk::program_stubs::SyscallStubs
         println!("[LOG] {}", message);
     }
 
-    fn sol_get_clock_sysvar(&self, _var_addr: *mut u8) -> u64 {
+    fn sol_get_clock_sysvar(&self, var_addr: *mut u8) -> u64 {
+        unsafe {
+            let var = std::slice::from_raw_parts_mut(var_addr, 8);
+            var.copy_from_slice(&self.slot.to_le_bytes());
+        }
+
         0
     }
 
