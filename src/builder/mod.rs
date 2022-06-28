@@ -100,6 +100,11 @@ pub struct AccountInfoWrapper {
     pub is_signer: bool,
     pub is_writable: bool,
     pub lamports: u64,
+    /// TODO: It would be good to have a way to specify what slice of this
+    /// buffer should be passed to the [`AccountInfo`]. Then, in the
+    /// [`crate::stub::ValidateCpis`] we could allow the implementor to change
+    /// the size of the [`RefCell`]'s slice, just as it's done in the system
+    /// program. This would enable us to mimic the Solana API more closely.
     pub data: Vec<u8>,
     pub owner: Pubkey,
     pub executable: bool,
