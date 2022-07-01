@@ -9,6 +9,10 @@ pub trait TokenAccountExt {
     fn mint(self, mint: Pubkey) -> Self;
 }
 
+pub trait MintExt {
+    fn supply(self, supply: u64) -> Self;
+}
+
 pub fn token_account(owner: Pubkey) -> Account {
     Account {
         owner,
@@ -35,6 +39,13 @@ impl TokenAccountExt for Account {
 
     fn mint(mut self, mint: Pubkey) -> Self {
         self.mint = mint;
+        self
+    }
+}
+
+impl MintExt for Mint {
+    fn supply(mut self, supply: u64) -> Self {
+        self.supply = supply;
         self
     }
 }
