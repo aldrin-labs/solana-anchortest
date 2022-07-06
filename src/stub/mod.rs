@@ -58,6 +58,8 @@ pub trait ValidateCpis {
 pub struct Syscalls<T> {
     cpi_validator: Arc<Mutex<T>>,
     slot: u64,
+    // All captured solana logs are pushed into this vector in order
+    logs: Mutex<Vec<String>>,
 }
 
 impl<T: ValidateCpis + Send + Sync + 'static> Syscalls<T> {
@@ -65,7 +67,13 @@ impl<T: ValidateCpis + Send + Sync + 'static> Syscalls<T> {
         Self {
             cpi_validator: Arc::new(Mutex::new(cpi_validator)),
             slot: 0,
+            logs: Default::default(),
         }
+    }
+
+    /// Returns all logs captured so far.
+    pub fn logs(&self) -> Vec<String> {
+        self.logs.lock().unwrap().clone()
     }
 
     pub fn slot(mut self, slot: u64) -> Self {
@@ -82,6 +90,7 @@ impl<T: ValidateCpis + Send + Sync> solana_sdk::program_stubs::SyscallStubs
     for Syscalls<T>
 {
     fn sol_log(&self, message: &str) {
+        self.logs.lock().unwrap().push(message.to_string());
         println!("[LOG] {}", message);
     }
 
