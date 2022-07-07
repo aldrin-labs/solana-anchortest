@@ -40,6 +40,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::entrypoint::ProgramResult;
 use anchor_lang::solana_program::instruction::Instruction;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub trait ValidateCpis {
@@ -54,19 +55,21 @@ pub trait ValidateCpis {
 
 /// Holds the necessary state which determines the configurable behavior of
 /// syscalls.
-#[derive(Default)]
+///
+/// Can be cloned, as all its inner workings are behind sync primitives.
+#[derive(Default, Clone, Debug)]
 pub struct Syscalls<T> {
     cpi_validator: Arc<Mutex<T>>,
-    slot: u64,
+    slot: Arc<AtomicU64>,
     // All captured solana logs are pushed into this vector in order
-    logs: Mutex<Vec<String>>,
+    logs: Arc<Mutex<Vec<String>>>,
 }
 
 impl<T: ValidateCpis + Send + Sync + 'static> Syscalls<T> {
     pub fn new(cpi_validator: T) -> Self {
         Self {
             cpi_validator: Arc::new(Mutex::new(cpi_validator)),
-            slot: 0,
+            slot: Default::default(),
             logs: Default::default(),
         }
     }
@@ -76,9 +79,13 @@ impl<T: ValidateCpis + Send + Sync + 'static> Syscalls<T> {
         self.logs.lock().unwrap().clone()
     }
 
-    pub fn slot(mut self, slot: u64) -> Self {
-        self.slot = slot;
-        self
+    /// Sets the slot returned by solana sysvar.
+    pub fn slot(&self, slot: u64) {
+        self.slot.store(slot, Ordering::SeqCst);
+    }
+
+    pub fn validator(&self) -> Arc<Mutex<T>> {
+        Arc::clone(&self.cpi_validator)
     }
 
     pub fn set(self) {
@@ -97,7 +104,8 @@ impl<T: ValidateCpis + Send + Sync> solana_sdk::program_stubs::SyscallStubs
     fn sol_get_clock_sysvar(&self, var_addr: *mut u8) -> u64 {
         unsafe {
             let var = std::slice::from_raw_parts_mut(var_addr, 8);
-            var.copy_from_slice(&self.slot.to_le_bytes());
+            let slot = self.slot.load(Ordering::SeqCst);
+            var.copy_from_slice(&slot.to_le_bytes());
         }
 
         0
