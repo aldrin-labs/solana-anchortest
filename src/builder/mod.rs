@@ -65,8 +65,6 @@ impl<'info> ContextWrapper<'info> {
             &mut self.accounts.as_slice(),
             &self.ix_data,
             &mut self.bumps,
-            // we don't use reallocs yet
-            &mut Default::default(),
         )
     }
 

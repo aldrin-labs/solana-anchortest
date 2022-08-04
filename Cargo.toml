@@ -1,10 +1,10 @@
 [package]
 name = "anchortest"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 
 [dependencies]
-solana-sdk = "1.10.29"
-anchor-lang = "0.25"
-anchor-spl = "0.25"
+solana-sdk = "1.9.19"
+anchor-lang = "0.24.2"
+anchor-spl = "0.24.2"
 bincode = "*" # whatever solana uses
